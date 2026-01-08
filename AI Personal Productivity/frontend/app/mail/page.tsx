@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { getEvents } from "../../lib/api";
+import React, { useMemo } from "react";
+import { useData } from "../context/DataContext";
 
 type Event = {
     id: string;
@@ -13,18 +13,11 @@ type Event = {
 };
 
 export default function MailPage() {
-    const [events, setEvents] = useState<Event[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { events: allEvents, loading } = useData();
 
-    useEffect(() => {
-        getEvents()
-            .then((res) => {
-                const mailEvents = res.events.filter((e: Event) => e.source === "gmail" || e.type === "email");
-                setEvents(mailEvents);
-            })
-            .catch(console.error)
-            .finally(() => setLoading(false));
-    }, []);
+    const events = useMemo(() => {
+        return allEvents.filter((e: Event) => e.source === "gmail" || e.type === "email");
+    }, [allEvents]);
 
     return (
         <main className="p-8 max-w-5xl mx-auto animate-fade-in">

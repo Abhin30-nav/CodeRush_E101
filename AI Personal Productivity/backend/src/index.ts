@@ -1,3 +1,4 @@
+import { config } from "./config"; // MUST be first to load env vars
 import express from "express";
 import { google } from "googleapis";
 import { getOAuthClient, GMAIL_SCOPES } from "./integrations/googleAuth";
@@ -5,7 +6,6 @@ import { getOAuthClient, GMAIL_SCOPES } from "./integrations/googleAuth";
 import cors from "cors";
 import bodyParser from "body-parser";
 import morgan from "morgan";
-import dotenv from "dotenv";
 import { PrismaClient } from "@prisma/client";
 import { inferContexts } from "./services/contextInference";
 import { buildRecommendation } from "./services/recommendation";
@@ -13,9 +13,6 @@ import { buildInsights } from "./services/insights";
 import { ActivityEvent } from "./types";
 import { ingestAllSources } from "./ingestion/ingest";
 import { analyzeCriticalItems } from "./services/criticalAnalysis";
-
-
-dotenv.config();
 
 const app = express();
 const prisma = new PrismaClient();
@@ -59,6 +56,35 @@ app.post("/api/events", async (req, res) => {
   }
 });
 
+app.patch("/api/events/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    // Try to update in DB
+    try {
+      const updated = await prisma.event.update({
+        where: { id },
+        data: {
+          metadata: updates.metadata ? updates.metadata : undefined,
+          // Add other fields if necessary, but metadata is flexible
+        },
+      });
+      return res.json(updated);
+    } catch (dbErr) {
+      // If not in DB, it might be a mock event.
+      // For now, we return 404 for mock events as we can't persist them easily without a DB sync.
+      // Front-end will handle optimistic updates.
+      // Or we could create a new event here?
+      // Let's keep it simple: strict 404 for now.
+      return res.status(404).json({ error: "Event not found or not editable" });
+    }
+  } catch (err) {
+    console.error("Failed to update event:", err);
+    res.status(500).json({ error: "Failed to update event" });
+  }
+});
+
 app.get("/api/contexts", async (_req, res) => {
   const events: ActivityEvent[] = await ingestAllSources(prisma);
   const { contexts } = await inferContexts(events);
@@ -83,6 +109,24 @@ app.get("/api/analysis", async (_req, res) => {
   const events = await ingestAllSources(prisma);
   const analysis = await analyzeCriticalItems(events);
   res.json(analysis);
+});
+
+app.post("/api/chat", async (req, res) => {
+  const { message, history } = req.body;
+
+  if (!message) {
+    return res.status(400).json({ error: "Message is required" });
+  }
+
+  try {
+    // Lazy import to avoid circular dep issues if any, though properly structured it should be fine.
+    const { processChatMessage } = await import("./services/chatService");
+    const response = await processChatMessage(message, history || [], prisma);
+    res.json(response);
+  } catch (err) {
+    console.error("Chat error:", err);
+    res.status(500).json({ error: "Internal server error processing chat" });
+  }
 });
 // =====================
 // Google OAuth (Gmail)

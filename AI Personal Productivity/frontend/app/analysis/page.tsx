@@ -1,38 +1,14 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { getCriticalAnalysis } from "../../lib/api";
-
-type CriticalItem = {
-    event: any;
-    reasoning: string;
-    priorityScore: number;
-};
-
-type ContextGroup = {
-    contextName: string;
-    summary: string;
-    eventIds: string[];
-};
-
+import React, { useEffect } from "react";
+import { useData } from "../context/DataContext";
 import { UrgencyChart, SourceChart } from "../../components/AnalysisGraphs";
 
 export default function AnalysisPage() {
-    const [data, setData] = useState<{
-        criticalItems: CriticalItem[];
-        contextGroups: ContextGroup[];
-        executiveSummary: string;
-    } | null>(null);
-    const [loading, setLoading] = useState(true);
+    const { analysisData, loading } = useData();
+    const data = analysisData;
 
-    useEffect(() => {
-        getCriticalAnalysis()
-            .then(setData)
-            .catch((err) => console.error(err))
-            .finally(() => setLoading(false));
-    }, []);
-
-    if (loading) {
+    if (loading && !data) {
         return (
             <div className="flex h-screen items-center justify-center">
                 <div className="flex flex-col items-center gap-4">

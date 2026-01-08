@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { getEvents } from "../../lib/api";
+import React, { useMemo } from "react";
+import { useData } from "../context/DataContext";
 
 type Event = {
     id: string;
@@ -13,18 +13,11 @@ type Event = {
 };
 
 export default function CalendarPage() {
-    const [events, setEvents] = useState<Event[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { events: allEvents, loading } = useData();
 
-    useEffect(() => {
-        getEvents()
-            .then((res) => {
-                const calEvents = res.events.filter((e: Event) => e.source === "calendar" || e.type === "meeting");
-                setEvents(calEvents);
-            })
-            .catch(console.error)
-            .finally(() => setLoading(false));
-    }, []);
+    const events = useMemo(() => {
+        return allEvents.filter((e: Event) => e.source === "calendar" || e.type === "meeting");
+    }, [allEvents]);
 
     return (
         <main className="p-8 max-w-5xl mx-auto animate-fade-in">
@@ -54,7 +47,7 @@ export default function CalendarPage() {
                                 </div>
                                 {evt.metadata.url && (
                                     <a href={evt.metadata.url} target="_blank" className="self-start md:self-center px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded text-sm transition-colors">
-                                        Join Meeting
+                                        Open
                                     </a>
                                 )}
                             </div>

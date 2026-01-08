@@ -23,6 +23,16 @@ export async function createTask(title: string) {
   return res.json();
 }
 
+export async function updateEvent(id: string, updates: any) {
+  const res = await fetch(`${API_BASE}/api/events/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(updates),
+  });
+  if (!res.ok) throw new Error("Failed to update event");
+  return res.json();
+}
+
 export async function getAuthStatus() {
   return fetchJson<{ authenticated: boolean }>("/api/auth/status");
 }
@@ -49,4 +59,14 @@ export async function getCriticalAnalysis() {
     contextGroups: any[];
     executiveSummary: string;
   }>("/api/analysis");
+}
+
+export async function chatWithBot(message: string, history: any[]) {
+  const res = await fetch(`${API_BASE}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, history }),
+  });
+  if (!res.ok) throw new Error("Chat failed");
+  return res.json();
 }

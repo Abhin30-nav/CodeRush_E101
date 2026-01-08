@@ -24,15 +24,16 @@ export async function analyzeCriticalItems(
 
     // Simplify events for the prompt to save tokens
     const simplifiedEvents = pendingEvents
-        .slice(0, 50) // Analyze top 50 most recent/relevant
+        .slice(0, 50)
         .map((e, idx) => ({
             id: e.id,
             title: e.title,
             type: e.type,
             date: e.timestamp.toISOString(),
             source: e.source,
-            metadata: e.metadata,
+            metadata: JSON.stringify(e.metadata ?? {}).slice(0, 300),
         }));
+
 
     const prompt = `
     You are an expert executive assistant with critical thinking skills. 
@@ -68,7 +69,7 @@ export async function analyzeCriticalItems(
   `;
 
     try {
-        const response = await askGemini(prompt);
+        const response = await askGemini(prompt, { jsonMode: true });
         if (!response) throw new Error("No response from AI");
 
         // Clean up markdown code blocks if present
@@ -93,16 +94,32 @@ export async function analyzeCriticalItems(
         };
 
     } catch (err) {
-        console.error("Critical analysis failed:", err);
-        // Fallback: simple date-based sort
-        return {
-            criticalItems: events.slice(0, 3).map(e => ({
+        console.error("Critical analysis failed, using fallback:", err);
+
+        // Smarter Fallback:
+        // 1. Sort by date (newest first)
+        // 2. Prioritize emails with "urgent" or "important" in title
+        const sortedEvents = [...events].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+        const criticalItems = sortedEvents.slice(0, 4).map(e => {
+            const isUrgent = e.title.toLowerCase().includes("urgent") || e.title.toLowerCase().includes("due");
+            return {
                 event: e,
-                reasoning: "Fallback: Most recent item",
-                priorityScore: 50
-            })),
-            contextGroups: [],
-            executiveSummary: "AI Analysis unavailable. Showing most recent items."
+                reasoning: isUrgent ? "Flagged as urgent based on keywords." : "Most recent activity requires review.",
+                priorityScore: isUrgent ? 85 : 60
+            };
+        });
+
+        return {
+            criticalItems,
+            contextGroups: [
+                {
+                    contextName: "Recent Activity",
+                    eventIds: criticalItems.map(c => c.event.id),
+                    summary: "Overview of your most recent emails and tasks (AI temporarily offline)."
+                }
+            ],
+            executiveSummary: "AI Analysis is currently offline due to connectivity issues. Showing most recent items ordered by date."
         };
     }
 }
